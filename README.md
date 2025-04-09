@@ -21,7 +21,7 @@ Install instruction:
 
 # Some sample training scripts:
 
-cd into experiment_scripts/
+cd into experiment_script/
 
 For a Dubins Car Reach-avoid example: 
 
