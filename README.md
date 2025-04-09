@@ -21,6 +21,8 @@ Install instruction:
 
 # Some sample training scripts:
 
+cd into experiment_scripts/
+
 For a Dubins Car Reach-avoid example: 
 
 > python run_training_sac_RA_nodist.py --control-net 512 512 512 --critic-net 512 512 512 --epoch 1 --total-episodes 40
