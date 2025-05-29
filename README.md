@@ -1,6 +1,6 @@
 # Reachability in Pytorch
 
-This is a minimal repository for doing HJ reachability analysis using the Discounted Safety/Reach-avoid Bellman equation originally introduced in [this](https://ieeexplore.ieee.org/abstract/document/8794107) and [this](https://arxiv.org/abs/2112.12288) paper. We build on the implementation used as baselines from [this repo](https://github.com/jamesjingqili/Lipschitz_Continuous_Reachability_Learning). 
+This is a minimal repository for doing HJ reachability analysis using the Discounted Safety/Reach-avoid Bellman equation originally introduced in [this](https://ieeexplore.ieee.org/abstract/document/8794107) and [this](https://arxiv.org/abs/2112.12288) paper. We build on the implementation used as baselines from [Jingqi Li's Repo](https://github.com/jamesjingqili/Lipschitz_Continuous_Reachability_Learning). 
 
 
 This repository supports SAC and DDPG implementations of both the safety-only and reach-avoid value functions. I have not yet tested HJ with disturbances.
@@ -21,9 +21,11 @@ Install instruction:
 
 # Some sample training scripts:
 
+cd into experiment_script/
+
 For a Dubins Car Reach-avoid example: 
 
-> python run_training_sac_RA_nodist.py --control-net 512 512 512 512 --critic-net 512 512 512 512 --epoch 1 --total-episodes 80
+> python run_training_sac_RA_nodist.py --control-net 512 512 512 --critic-net 512 512 512 --epoch 1 --total-episodes 40
 
 For a Dubins car avoid-only example: 
 
