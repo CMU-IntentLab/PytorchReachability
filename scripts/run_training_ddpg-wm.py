@@ -371,8 +371,8 @@ def evaluate_V(state):
     tmp = policy.critic(tmp_batch.obs, policy(tmp_batch, model="actor_old").act)
     return tmp.cpu().detach().numpy().flatten()
 def get_eval_plot(cache, thetas):
-    fig1, axes1 = plt.subplots(len(thetas), 1, figsize=(1, 5))
-    fig2, axes2 = plt.subplots(len(thetas), 1, figsize=(1, 5))
+    fig1, axes1 = plt.subplots(len(thetas), 1, figsize=(3, 10))
+    fig2, axes2 = plt.subplots(len(thetas), 1, figsize=(3, 10))
 
     for i in range(len(thetas)):
         theta = thetas[i]
@@ -390,11 +390,10 @@ if not os.path.exists(log_path+"/epoch_id_{}".format(epoch)):
     print("Just created the log directory!")
     # print("log_path: ", log_path+"/epoch_id_{}".format(epoch))
     os.makedirs(log_path+"/epoch_id_{}".format(epoch))
-thetas = [0, np.pi/6, np.pi/3, np.pi/2]
+thetas = [3*np.pi/2, 7*np.pi/4, 0,  np.pi/4, np.pi/2, np.pi]
 cache = make_cache(config, thetas)
 logger = None
-gammas = np.linspace(0.99, 0.9999, endpoint=True, num=args.total_episodes)
-warmup = 3
+warmup = 1
 plot1, plot2 = get_eval_plot(cache, thetas)
 
 for iter in range(warmup+args.total_episodes):
@@ -402,7 +401,7 @@ for iter in range(warmup+args.total_episodes):
         policy._gamma = 0 # for warmup the value fn
         policy.warmup = True
     else:
-        policy._gamma = gammas[iter - warmup]
+        policy._gamma = config.gamma_pyhj
         policy.warmup = False
 
     if args.continue_training_epoch is not None:

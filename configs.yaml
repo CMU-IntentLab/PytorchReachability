@@ -132,13 +132,13 @@ defaults:
   tau: 0.005 # type=float, default=0.005)
   exploration-noise: 0.1 # type=float, default=0.1)
   epoch: 1 # type=int, default=10)
-  total-episodes: 25 # type=int, default=160)
+  total-episodes: 15 # type=int, default=160)
   step-per-epoch: 40000 # type=int, default=40000)
   step-per-collect: 8 # type=int, default=8)
   update-per-step: 0.125 # type=float, default=0.125)
   batch_size-pyhj: 512 # type=int, default=512)
-  control-net: [512, 512, 512] # type=int, nargs='*', default=None) # for control policy
-  critic-net: [512, 512, 512] # type=int, nargs='*', default=None) # for critic net
+  control-net: [128, 128, 128] # type=int, nargs='*', default=None) # for control policy
+  critic-net: [128, 128, 128] # type=int, nargs='*', default=None) # for critic net
   training-num: 1 # type=int, default=8)
   test-num: 1 # type=int, default=100)
   render: 0. # type=float, default=0.)
@@ -152,12 +152,12 @@ defaults:
   auto-alpha: 1
   alpha-lr: 3e-4
   alpha: 0.2 
-  weight-decay-pyhj: 0.01
+  weight-decay-pyhj: 0.001
   
   actor-activation: 'ReLU' #type=str, default='ReLU')
   critic-activation: 'ReLU' # type=str, default='ReLU')
   kwargs: {} # type=str, default='{}')
   warm-start-path: null # type=str, default=None) # e.g., log/ra_droneracing_Game-v6/epoch_id_10/policy.pth
 
-  nx: 31
-  ny: 31
+  nx: 41
+  ny: 41
