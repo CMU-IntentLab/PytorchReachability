@@ -45,7 +45,7 @@ from load_config import load_config
 
 
 def load_models():
-    config = load_config("/home/kensuke/PytorchReachability/configs.yaml")
+    config = load_config("/content/PytorchReachability/configs.yaml")
     env = gymnasium.make(config.task, params = [config])
     config.num_actions = env.action_space.n if hasattr(env.action_space, "n") else env.action_space.shape[0]
     wm = models.WorldModel(env.observation_space_full, env.action_space, 0, config)
