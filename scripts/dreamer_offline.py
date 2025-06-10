@@ -334,7 +334,7 @@ class Dreamer(nn.Module):
         return obs_loss.item()
     
     def fill_cache(self):
-        print('filling cache')
+        print('filling cache (this might take a while)...')
         nx, ny, nz = 41, 41, 3
         self.nz =nz
         self.v = np.zeros((nx, ny, nz))
