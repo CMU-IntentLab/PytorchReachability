@@ -41,7 +41,7 @@ import matplotlib.pyplot as plt
 # note: need to include the dreamerv3 repo for this
 from dreamer import make_dataset
 from scripts.generate_data_traj_cont import get_frame
-from load_config import load_config
+from helper.load_config import load_config
 
 
 def load_models():
