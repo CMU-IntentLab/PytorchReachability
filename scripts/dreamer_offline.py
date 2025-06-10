@@ -273,14 +273,39 @@ class Dreamer(nn.Module):
                     pos = wm.heads["margin"](safe_dataset)
                     neg = wm.heads["margin"](unsafe_dataset)
                     
-                    gamma = self._config.gamma_lx
-                    lx_loss = 0.0
-                    if pos.numel() > 0:
-                        lx_loss += torch.relu(gamma - pos).mean()
-                    if neg.numel() > 0:
-                        lx_loss += torch.relu(gamma + neg).mean()
+                    safe_loss = torch.relu(-pos).mean()
+                    unsafe_loss = torch.relu(neg).mean()
+                    N = min(pos.numel(), neg.numel())
+                    if N > 0:
+                        pos_data = safe_dataset[:N]
+                        neg_data = unsafe_dataset[:N]
+                        # gradient penalty
+                        alpha = torch.rand(pos_data.shape[0], 1, device=pos_data.device)
+                        interpolates = alpha * pos_data + (1 - alpha) * neg_data
 
-                    lx_loss *=  self._config.margin_head["loss_scale"]
+                        interpolates.requires_grad_(True)
+                        disc_interpolates = wm.heads["margin"](interpolates)
+                        print('alpha', alpha.shape, pos_data.shape, neg_data.shape, interpolates.shape, disc_interpolates.shape)
+
+                        gradients = torch.autograd.grad(
+                            outputs=disc_interpolates,
+                            inputs=interpolates,
+                            grad_outputs=torch.ones_like(disc_interpolates),
+                            create_graph=True,
+                            retain_graph=True,
+                            only_inputs=True,
+                        )[0]
+                        print(gradients.shape, interpolates.shape)
+                        gradient_penalty = (
+                            10*
+                            ((gradients.norm(2, dim=-1) - 1) ** 2).mean()
+                        )
+                    lx_loss = safe_loss + unsafe_loss + gradient_penalty
+                    lx_loss *= self._config.margin_head["loss_scale"]
+
+
+                    
+
                     if step < 3000:
                         lx_loss *= 0
                         cont_loss *= 0
@@ -335,7 +360,7 @@ class Dreamer(nn.Module):
     
     def fill_cache(self):
         print('filling cache')
-        nx, ny, nz = 41, 41, 3
+        nx, ny, nz = self._config.nx, self._config.ny, self._config.nz
         self.nz =nz
         self.v = np.zeros((nx, ny, nz))
         v = self.v
@@ -555,11 +580,14 @@ def main(config):
         expert_dataset,
     ).to(config.device)
     agent.requires_grad_(requires_grad=False)
-    if (logdir / "latest.pt").exists():
-        checkpoint = torch.load(logdir / "latest.pt")
+    init_step = 0
+    '''if (logdir / "rssm_ckpt_4999_base.pt").exists():
+        print("Loading from checkpoint.")
+        checkpoint = torch.load(logdir / "rssm_ckpt_4999_base.pt")
         agent.load_state_dict(checkpoint["agent_state_dict"])
         tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
         agent._should_pretrain._once = False
+        init_step = 5000'''
 
     def log_plot(title, data):
         buf = BytesIO()
@@ -610,10 +638,10 @@ def main(config):
 
         
         logger.write(step=logger.step)
-        recon_eval = eval_obs_recon()  # testing observation reconstruction
+        #recon_eval = eval_obs_recon()  # testing observation reconstruction
 
         agent.train()
-        return recon_eval, recon_eval
+        return 0, 0 #recon_eval, recon_eval
     # ==================== Pretrain ====================
     total_train_steps = config.rssm_train_steps 
     print(total_train_steps)
@@ -627,29 +655,30 @@ def main(config):
         ckpt_name = "rssm_ckpt" 
         best_pretrain_success = float("inf")
         for step in trange(
-            total_train_steps,
+            total_train_steps-init_step,
             desc="Training the RSSM",
             ncols=0,
             leave=False,
         ):
             if (
-                ((step + 1) % config.eval_every) == 0
-                or step == 1
+                ((step +init_step + 1) % config.eval_every) == 0
+                or step+init_step == 1
             ):
-                score, success = evaluate(
-                    other_dataset=expert_dataset, eval_prefix="pretrain"
-                )
+                
                 lx_plot, tp, fn, fp, tn = agent.get_eval_plot()
 
                 logger.image("pretrain/lx_plot", np.transpose(lx_plot, (2, 0, 1)))
                 
+                score, success = evaluate(
+                    other_dataset=expert_dataset, eval_prefix="pretrain"
+                )
                 best_pretrain_success = tools.save_checkpoint(
-                    ckpt_name, step, success, best_pretrain_success, agent, logdir
+                    ckpt_name, step+init_step, success, best_pretrain_success, agent, logdir
                 )
 
     
             exp_data = next(expert_dataset)
-            agent.pretrain_model_only(exp_data, step)
+            agent.pretrain_model_only(exp_data, step+init_step)
     
 
 if __name__ == "__main__":
