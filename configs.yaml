@@ -60,7 +60,7 @@ defaults:
   dyn_mean_act: 'none'
   dyn_std_act: 'sigmoid2'
   dyn_min_std: 0.1
-  grad_heads: ['decoder', "margin", "cont"]
+  grad_heads: ['decoder', "cont"]
   units: 512
   act: 'SiLU'
   norm: True
@@ -159,6 +159,6 @@ defaults:
   kwargs: {} # type=str, default='{}')
   warm-start-path: null # type=str, default=None) # e.g., log/ra_droneracing_Game-v6/epoch_id_10/policy.pth
 
-  nx: 21
-  ny: 21
+  nx: 31
+  ny: 31
   nz: 3

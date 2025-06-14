@@ -21,7 +21,7 @@ import models
 import tools
 import envs.wrappers as wrappers
 from parallel import Parallel, Damy
-
+import networks
 import torch
 from torch import nn
 from torch import distributions as torchd
@@ -38,6 +38,7 @@ import io
 
 to_np = lambda x: x.detach().cpu().numpy()
 from generate_data_traj_cont import get_frame
+from torch.autograd import Variable
 
 class Dreamer(nn.Module):
     def __init__(self, obs_space, act_space, config, logger, dataset):
@@ -56,6 +57,12 @@ class Dreamer(nn.Module):
         self._update_count = 0
         self._dataset = dataset
         self._wm = models.WorldModel(obs_space, act_space, self._step, config)
+
+        if config.dyn_discrete:
+            feat_size = config.dyn_stoch * config.dyn_discrete + config.dyn_deter
+        else:
+            feat_size = config.dyn_stoch + config.dyn_deter
+
         self._task_behavior = models.ImagBehavior(config, self._wm)
         if (
             config.compile and os.name != "nt"
@@ -169,24 +176,30 @@ class Dreamer(nn.Module):
             model_params = {
                 "params": list(self._wm.encoder.parameters())
                 + list(self._wm.dynamics.parameters())
+                + list(self._wm.heads["decoder"].parameters())
+                + list(self._wm.heads["cont"].parameters())
             }
-            model_params["params"] += list(self._wm.heads["decoder"].parameters())
-            actor_params = {
-                "params": list(self._task_behavior.actor.parameters()),
-                "lr": config.actor["lr"],
-                "eps": config.actor["eps"],
-                "clip": config.actor["grad_clip"],
-            }
-            self.pretrain_params = list(model_params["params"]) + list(
-                actor_params["params"]
-            )
+            self.pretrain_params = list(model_params["params"])
             self.pretrain_opt = tools.Optimizer(
-                "pretrain_opt", [model_params, actor_params], **standard_kwargs
+                "pretrain_opt", [model_params], **standard_kwargs
             )
+
+            margin_params = {
+                "params": list(self._wm.heads["margin"].parameters())
+            }
+
+            self.margin_params = list(margin_params["params"])
+            self.margin_opt = tools.Optimizer(
+                "margin_opt", [margin_params], **standard_kwargs
+            )
+            
             self.actor_params = list(self._task_behavior.actor.parameters())
             
             print(
                 f"Optimizer pretrain has {sum(param.numel() for param in self.pretrain_params)} variables."
+            )
+            print(
+                f"Optimizer margin has {sum(param.numel() for param in self.margin_params)} variables."
             )
 
     def _update_running_metrics(self, metrics):
@@ -221,7 +234,7 @@ class Dreamer(nn.Module):
         actor = self._task_behavior.actor
         data = wm.preprocess(data)
         
-        with tools.RequiresGrad(wm), tools.RequiresGrad(actor):
+        with tools.RequiresGrad(wm):
             with torch.amp.autocast("cuda", enabled=wm._use_amp):
                 embed = wm.encoder(data)
                 # post: z_t, prior: \hat{z}_t
@@ -258,69 +271,23 @@ class Dreamer(nn.Module):
                     for name, pred in preds.items():
                         if name == "cont":
                             cont_loss = -pred.log_prob(data[name])
-                        elif name != "margin":
+                        else:
                             loss = -pred.log_prob(data[name])
                             assert loss.shape == embed.shape[:2], (name, loss.shape)
                             losses[name] = loss
                         
                     recon_loss = sum(losses.values())
-                    # failure margin
-                    failure_data = data["failure"]
-                    safe_data = torch.where(failure_data == 0.)
-                    unsafe_data = torch.where(failure_data == 1.)
-                    safe_dataset = feat[safe_data]
-                    unsafe_dataset = feat[unsafe_data]
-                    pos = wm.heads["margin"](safe_dataset)
-                    neg = wm.heads["margin"](unsafe_dataset)
-                    
-                    safe_loss = torch.relu(-pos).mean()
-                    unsafe_loss = torch.relu(neg).mean()
-                    N = min(pos.numel(), neg.numel())
-                    if N > 0:
-                        pos_data = safe_dataset[:N]
-                        neg_data = unsafe_dataset[:N]
-                        # gradient penalty
-                        alpha = torch.rand(pos_data.shape[0], 1, device=pos_data.device)
-                        interpolates = alpha * pos_data + (1 - alpha) * neg_data
 
-                        interpolates.requires_grad_(True)
-                        disc_interpolates = wm.heads["margin"](interpolates)
-                        print('alpha', alpha.shape, pos_data.shape, neg_data.shape, interpolates.shape, disc_interpolates.shape)
-
-                        gradients = torch.autograd.grad(
-                            outputs=disc_interpolates,
-                            inputs=interpolates,
-                            grad_outputs=torch.ones_like(disc_interpolates),
-                            create_graph=True,
-                            retain_graph=True,
-                            only_inputs=True,
-                        )[0]
-                        print(gradients.shape, interpolates.shape)
-                        gradient_penalty = (
-                            10*
-                            ((gradients.norm(2, dim=-1) - 1) ** 2).mean()
-                        )
-                    lx_loss = safe_loss + unsafe_loss + gradient_penalty
-                    lx_loss *= self._config.margin_head["loss_scale"]
-
-
-                    
-
-                    if step < 3000:
-                        lx_loss *= 0
-                        cont_loss *= 0
-            
-
-                model_loss = kl_loss + recon_loss + lx_loss + cont_loss
+                model_loss = kl_loss + recon_loss + cont_loss
                 metrics = self.pretrain_opt(
                     torch.mean(model_loss), self.pretrain_params
                 )
+
         metrics.update({f"{name}_loss": to_np(loss) for name, loss in losses.items()})
         metrics["kl_loss"] = to_np(kl_loss)
         metrics["dyn_loss"] = to_np(dyn_loss)
         metrics["rep_loss"] = to_np(rep_loss)
         metrics["kl_value"] = to_np(torch.mean(kl_value))
-        metrics["lx_loss"] = to_np(lx_loss)
         metrics["cont_loss"] = to_np(cont_loss)
 
         with torch.amp.autocast("cuda", enabled=wm._use_amp):
@@ -330,6 +297,66 @@ class Dreamer(nn.Module):
             metrics["post_ent"] = to_np(
                 torch.mean(wm.dynamics.get_dist(post).entropy())
             )
+        
+
+       
+        with tools.RequiresGrad(self._wm.heads["margin"]):
+            with torch.amp.autocast("cuda", enabled=wm._use_amp):
+                # failure margin
+                failure_data = data["failure"]
+                safe_data = torch.where(failure_data == 0.)
+                unsafe_data = torch.where(failure_data == 1.)
+                feat_detached = feat.detach()
+                safe_dataset = feat_detached[safe_data]
+                unsafe_dataset = feat_detached[unsafe_data]
+                pos = self._wm.heads["margin"](safe_dataset)
+                neg = self._wm.heads["margin"](unsafe_dataset)
+                N = max(pos.numel(), neg.numel())
+                if N > 0:
+                    if N > safe_dataset.shape[0]:
+                        repeat_times = (N + safe_dataset.shape[0] - 1) // safe_dataset.shape[0]  # Ceiling division
+                        safe_repeated = safe_dataset.repeat((repeat_times,) + (1,) * (safe_dataset.dim() - 1))  # Repeat along batch dim
+                        indices = torch.randperm(safe_repeated.shape[0], device=safe_dataset.device)[:N]
+                        pos_data =  safe_repeated[indices]
+                    else:
+                        pos_data = safe_dataset
+                    if N > unsafe_dataset.shape[0]:
+                        repeat_times = (N + unsafe_dataset.shape[0] - 1) // unsafe_dataset.shape[0]  # Ceiling division
+                        unsafe_repeated = unsafe_dataset.repeat((repeat_times,) + (1,) * (unsafe_dataset.dim() - 1))  # Repeat along batch dim
+                        indices = torch.randperm(unsafe_repeated.shape[0], device=unsafe_dataset.device)[:N]
+                        neg_data =  unsafe_repeated[indices]
+                    else:
+                        neg_data = unsafe_dataset
+                    # gradient penalty
+                    alpha = torch.rand(pos_data.shape[0], 1, device=pos_data.device)
+                    interpolates = alpha * pos_data + (1 - alpha) * neg_data
+                    interpolates.requires_grad_(True)
+                    disc_interpolates = self._wm.heads["margin"](interpolates)
+
+                    gradients = torch.autograd.grad(
+                        outputs=disc_interpolates,
+                        inputs=interpolates,
+                        grad_outputs=torch.ones_like(disc_interpolates),
+                        create_graph=True,
+                        retain_graph=True,
+                        only_inputs=True,
+                    )[0]
+                    gradients = gradients.view(pos_data.shape[0], -1)
+                    gradients_norm = torch.sqrt(torch.sum(gradients**2, dim=1) + 1e-12)
+
+                    gp_loss = ((gradients_norm - 0.1) ** 2).mean()
+                zero_sum_loss = neg.mean() + -pos.mean()
+                relu_loss = torch.relu(self._config.gamma_lx + neg.mean()) + torch.relu(self._config.gamma_lx - pos.mean())
+
+                loss = 0.01*zero_sum_loss + relu_loss + 10 * gp_loss
+                
+                metrics["margin_gp"] = gp_loss.item()
+                metrics.update(self.margin_opt(loss, self._wm.heads["margin"].parameters()))
+
+                metrics["sign_loss"] = to_np(relu_loss)
+                metrics["gp_loss"] = to_np(gp_loss)
+                self._wm.heads["margin"].eval()
+
         metrics = {
             f"model_only_pretrain/{k}": v for k, v in metrics.items()
         }  # Add prefix model_pretrain to all metrics
@@ -439,7 +466,8 @@ class Dreamer(nn.Module):
         
         vmax = round(max(np.max(v), 0),1)
         vmin = round(min(np.min(v), -vmax),1)
-        
+        vmax = min(vmax, 2.)
+        vmin = max(vmin, -2)
         fig, axes = plt.subplots(self.nz, 2, figsize=(12, self.nz*6))
         
         for i in range(self.nz):
@@ -581,13 +609,13 @@ def main(config):
     ).to(config.device)
     agent.requires_grad_(requires_grad=False)
     init_step = 0
-    '''if (logdir / "rssm_ckpt_4999_base.pt").exists():
-        print("Loading from checkpoint.")
-        checkpoint = torch.load(logdir / "rssm_ckpt_4999_base.pt")
-        agent.load_state_dict(checkpoint["agent_state_dict"])
-        tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
-        agent._should_pretrain._once = False
-        init_step = 5000'''
+    #if (logdir / "rssm_ckpt_2999_base.pt").exists():
+    #    print("Loading from checkpoint.")
+    #    checkpoint = torch.load(logdir / "rssm_ckpt_2999_base.pt")
+    #    agent.load_state_dict(checkpoint["agent_state_dict"])
+    #    tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
+    #    agent._should_pretrain._once = False
+    #    init_step = 3000
 
     def log_plot(title, data):
         buf = BytesIO()
@@ -599,29 +627,7 @@ def main(config):
         plot = Image.open(buf).convert("RGB")
         plot_arr = np.array(plot)
         logger.image("pretrain/" + title, np.transpose(plot_arr, (2, 0, 1)))
-    def eval_obs_recon():
-        recon_steps = 101
-        obs_mlp, obs_opt = agent._wm._init_obs_mlp(config, 3)
-        train_loss = []
-        eval_loss = []
-        for i in range(recon_steps):
-            if i % int(recon_steps/4) == 0:
-                new_loss = agent.pretrain_regress_obs(
-                    next(eval_dataset), obs_mlp, obs_opt, eval=True
-                )
-                eval_loss.append(new_loss)
-            else:
-                new_loss = agent.pretrain_regress_obs(
-                    next(expert_dataset), obs_mlp, obs_opt
-                )
-                train_loss.append(new_loss)
-        log_plot("train_recon_loss", train_loss)
-        log_plot("eval_recon_loss", eval_loss)
-        logger.scalar("pretrain/train_recon_loss_min", np.min(train_loss))
-        logger.scalar("pretrain/eval_recon_loss_min", np.min(eval_loss))
-        logger.write(step=logger.step)
-        del obs_mlp, obs_opt  # dont need to keep these
-        return np.min(eval_loss)
+    
     def evaluate(other_dataset=None, eval_prefix=""):
         agent.eval()
         

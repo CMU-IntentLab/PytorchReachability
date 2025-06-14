@@ -244,7 +244,10 @@ def fill_expert_dataset_dubins(config, cache, is_val_set=False):
             transition["is_last"] = np.array(traj["dones"][t], dtype=np.bool_)
             transition["is_terminal"] = np.array(traj["dones"][t], dtype=np.bool_)
             transition["discount"] = np.array(1, dtype=np.float32)
-            transition["action"] = np.array(traj["actions"][t], dtype=np.float32)
+            if t == 0:
+                transition["action"] = np.array(traj["actions"][t]*0, dtype=np.float32)
+            else:
+                transition["action"] = np.array(traj["actions"][t-1], dtype=np.float32)
             
             add_to_cache(cache, f"exp_traj_{i}", transition)
     if not is_val_set:

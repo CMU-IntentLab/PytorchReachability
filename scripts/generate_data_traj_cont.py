@@ -30,7 +30,7 @@ def get_frame(states, config):
   # Add the circle patch to the axis
   ax.add_patch(circle)
   plt.quiver(states[0], states[1], dt*v*torch.cos(states[2]), dt*v*torch.sin(states[2]), angles='xy', scale_units='xy', minlength=0,width=0.1, scale=0.18,color=(0,0,1), zorder=3)
-  plt.scatter(states[0], states[1],s=20, c=(0,0,1), zorder=3)
+  plt.scatter(states[0], states[1],s=20, color=(0,0,1), zorder=3)
   plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
   buf = io.BytesIO()
