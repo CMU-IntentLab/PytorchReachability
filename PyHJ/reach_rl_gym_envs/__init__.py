@@ -62,3 +62,9 @@ register(
     reward_threshold=1e8,
 )
 
+register(
+    id="franka_wm_DINO-v0",
+    entry_point="PyHJ.reach_rl_gym_envs.franka-DINOwm:Franka_DINOWM_Env",
+    max_episode_steps=10,
+    reward_threshold=1e8,
+)
