@@ -1,16 +1,8 @@
 import matplotlib.pyplot as plt
 import os
 import numpy as np
-from PIL import Image
-import torchvision.transforms.v2 as transforms
-from torchvision.transforms import functional as F
-import imageio.v3 as iio
 import h5py
 import shutil
-
-
-
-
 
 # Global variables
 current_idx = 0
@@ -110,19 +102,19 @@ if __name__ == "__main__":
     #directory = "/data/ken/ken_data/skittles_big"
     #labeled_directory = "/data/ken/ken_data/skittles_big_labeled_new"
 
-    directory = "/data/ken/ken_data/mm-unsafe"
-    labeled_directory = "/data/ken/ken_data/mm-unsafe-labeled"
+    #directory = "/data/ken/ken_data/mm-unsafe"
+    #labeled_directory = "/data/ken/ken_data/mm-unsafe-labeled"
 
 
-    directory = "/data/ken/latent-unsafe-test"
-    labeled_directory = "/data/ken/latent-unsafe-test-labeled2"
+    directory = "/data/ken/latent-test"
+    labeled_directory = "/data/ken/latent-test-labeled"
     # make labeled directory if it does not exist
     if not os.path.exists(labeled_directory):
         os.makedirs(labeled_directory)
 
     # Get all pickle files with "unsafe" in the filename
     hdf5_files = [f for f in os.listdir(directory)]
-    hdf5_files = [f for f in hdf5_files if "unsafe" in f]
+    hdf5_files = [f for f in hdf5_files if "hdf5" in f]
     print('total files:', len(hdf5_files))
     done_files = [f for f in os.listdir(labeled_directory)]
     print('done files:', len(done_files))

@@ -1,61 +1,21 @@
-import argparse
-import collections
-import os
-import pathlib
-import sys
-import numpy as np
-import ruamel.yaml as yaml
 import torch
-from termcolor import cprint
-import cv2
-# add to os sys path
-import sys
-import matplotlib.pyplot as plt
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(parent_dir)
-dreamer_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../model_based_irl_torch'))
-sys.path.append(dreamer_dir)
-env_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../real_envs'))
-sys.path.append(env_dir)
-print(dreamer_dir)
-print(sys.path)
-import model_based_irl_torch.dreamer.tools as tools
-from model_based_irl_torch.dreamer.dreamer import Dreamer
-from termcolor import cprint
-from real_envs.env_utils import normalize_eef_and_gripper, unnormalize_eef_and_gripper, get_env_spaces
-import pickle
-from collections import defaultdict
-from model_based_irl_torch.dreamer.tools import add_to_cache
-from tqdm import tqdm, trange
-from model_based_irl_torch.common.utils import to_np
 import wandb
+from torch import nn
+from torch.optim import AdamW
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from einops import rearrange
+import matplotlib.pyplot as plt
+from test_loader import SplitTrajectoryDataset
+from dino_decoder import VQVAE
 
 dino = torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14_reg')
 
-import requests
-from PIL import Image
-from torchvision import transforms
-
-import torch
-from torch import nn
-from torch.optim import AdamW
-
-from einops import rearrange, repeat
-from einops.layers.torch import Rearrange
-
-from torch.utils.data import DataLoader
-from test_loader import SplitTrajectoryDataset
-import torch
-from torch import nn
-from torch.functional import F
-
-from dino_decoders_official import VQVAE
 
 DINO_transform = transforms.Compose([           
                                 transforms.Resize(224),                                
                                 transforms.ToTensor(),])
 
-from einops import rearrange, repeat
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 

@@ -1,41 +1,25 @@
-from os import path
 from typing import Optional
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
-import matplotlib.pyplot as plt
-import io
-from PIL import Image
-import matplotlib.patches as patches
 import torch
-import math
+import os
+import sys
 from torch.utils.data import DataLoader
-from dino_models import normalize_acs
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(parent_dir)
+
+from dino_wm.dino_models import normalize_acs
 
 
 class Franka_DINOWM_Env(gym.Env):
     # TODO: 1. baseline over approximation; 2. our critic loss drop faster 
-    def __init__(self, params):
-        self.render_mode = None
-        self.time_step = 0.05
-        self.high = np.array([
-            1., 1., np.pi,
-        ])
-        self.low = np.array([
-            -1., -1., -np.pi
-        ])
-        self.device = 'cuda:1'
-
+    def __init__(self, params, device='cuda:0'):
+        self.device = device
         self.set_wm(*params)
 
-        #self.observation_space = spaces.Box(low=self.low, high=self.high, dtype=np.float32)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(1,1,786), dtype=np.float32)
-        self.action1_space = spaces.Box(low=-1.0, high=1.0, shape=(7,), dtype=np.float32) # control action space
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(7,), dtype=np.float32) # joint action space
-        self.scalar = 0.15
-        self.image_size=128
-        self.N = 5 # number of samples to take
-
+        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(7,), dtype=np.float32) 
         self.front_hist = None
         self.wrist_hist = None
         self.state_hist = None
@@ -80,9 +64,9 @@ class Franka_DINOWM_Env(gym.Env):
             self._reset_loader()
             data= next(self.data)
         inputs2 = data['cam_rs_embd'][[0], :].to(self.device)
-        inputs1 = data['cam_zed_right_embd'][[0], :].to(self.device)
+        inputs1 = data['cam_zed_embd'][[0], :].to(self.device)
         acs = data['action'][[0],:].to(self.device)
-        acs = normalize_acs(acs)
+        acs = normalize_acs(acs, device=self.device)
         states = data['state'][[0],:].to(self.device)
         
         self.latent = self.wm.forward_features(inputs1, inputs2, states, acs)[:, [0]]

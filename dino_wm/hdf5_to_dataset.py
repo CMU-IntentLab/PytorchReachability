@@ -1,5 +1,4 @@
 import os
-import pickle
 import h5py
 import numpy as np
 import torch
@@ -7,7 +6,6 @@ from torchvision import transforms
 
 import os
 import h5py
-import json
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -194,7 +192,7 @@ def convert_hdf5_to_consolidated_hdf5(hdf5_dir, output_hdf5_file):
                 print(f"Copied {hdf5_file} → trajectory_{i}")
 
 if __name__ == '__main__':
-    hdf5_dir = "/data/ken/latent"
-    output_hdf5_file = "/data/ken/latent/consolidated.h5"
+    hdf5_dir = "/data/ken/latent-labeled"
+    output_hdf5_file = "/data/ken/latent-labeled/consolidated.h5"
     preprocess(hdf5_dir)
     convert_hdf5_to_consolidated_hdf5(hdf5_dir, output_hdf5_file)
