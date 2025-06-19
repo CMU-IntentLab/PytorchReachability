@@ -84,7 +84,7 @@ class Franka_DINOWM_Env(gym.Env):
         
         with torch.no_grad():  # Disable gradient calculation
 
-            outputs = torch.tanh(1.5*self.wm.failure_pred(latent)[0,-1])
+            outputs = torch.tanh(2*self.wm.failure_pred(latent)[0,-1])
             g_xList.append(outputs.detach().cpu().numpy())
         
         safety_margin = np.array(g_xList).squeeze()

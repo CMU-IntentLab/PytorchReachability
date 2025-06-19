@@ -43,7 +43,7 @@ wm = VideoTransformer(
         dropout=0.1
     )
 
-wm.load_state_dict(torch.load('/home/kensuke/latent-test/PytorchReachability/dino_wm/checkpoints/best_classifier.pth'))
+wm.load_state_dict(torch.load('/home/kensuke/latent-test/PytorchReachability/dino_wm/checkpoints/best_classifier_gp.pth'))
 
 hdf5_file = '/data/ken/latent-unsafe/consolidated.h5'
 bs = 1
@@ -96,7 +96,7 @@ critic = Critic(critic_net, device=critic_net.device).to(critic_net.device)
 critic_optim = torch.optim.Adam(critic.parameters(), lr=1e-3, weight_decay=1e-3)
 
 
-from PyHJ.policy import avoid_DDPGPolicy_annealing as DDPGPolicy
+from PyHJ.policy import avoid_DDPGPolicy_annealing_dinowm as DDPGPolicy
 
 print("DDPG under the Avoid annealed Bellman equation with no Disturbance has been loaded!")
 
@@ -121,7 +121,7 @@ actor_optim=actor_optim,
 actor_gradient_steps=1,
 )
 
-log_path = os.path.join("logs/dinowm/")
+log_path = os.path.join("logs/dinowm")
 
 
 # collector
@@ -162,9 +162,11 @@ for iter in range(warmup+total_eps):
     if iter  < warmup:
         policy._gamma = 0 # for warmup the value fn
         policy.warmup = True
+        steps = 10000
     else:
-        policy._gamma = 0.9999
+        policy._gamma = 0.95
         policy.warmup = False
+        steps = 40000
     
     print("episodes: {}, remaining episodes: {}".format(iter, warmup+total_eps - iter))
     epoch = epoch + 1
@@ -187,7 +189,7 @@ for iter in range(warmup+total_eps):
     train_collector,
     test_collector,
     1,
-    40000, # steps per epoch
+    steps, # steps per epoch
     8, # step per collect
     1, # test num
     512, # batch size
