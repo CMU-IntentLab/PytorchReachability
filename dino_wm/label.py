@@ -1,8 +1,16 @@
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+from PIL import Image
+import torchvision.transforms.v2 as transforms
+from torchvision.transforms import functional as F
+import imageio.v3 as iio
 import h5py
 import shutil
+
+
+
+
 
 # Global variables
 current_idx = 0
@@ -61,10 +69,6 @@ def process_trajectory(traj_file):
             wrist = data["camera_0"][i]
             front = data["camera_1"][i]
 
-            #front_image = Image.fromarray(front)
-            #front_image = Image.fromarray((front_image.numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
-            #front = np.array(front_image)
-
             joint = np.concatenate([wrist, front], axis=1)
             images.append(joint)
 
@@ -72,6 +76,22 @@ def process_trajectory(traj_file):
     current_idx = 0
     while current_idx < len(images) and current_idx in labels:
         current_idx += 1
+
+
+def process_trajectory_safe(traj_file):
+    """Load images from a trajectory file and set up labels."""
+    global images, labels, current_idx, current_traj
+
+    current_traj = os.path.splitext(os.path.basename(traj_file))[0]
+    print(f"Processing trajectory: {current_traj}")
+    labels = {}
+
+    # Load images
+    images = []
+    with h5py.File(traj_file, "r") as hf:
+        data = hf['data']
+        for i in range(data["camera_0"][:].shape[0]):
+            labels[i] = 0
 
 
 def postprocess_trajectory(done_file, labels, traj_file):
@@ -97,24 +117,15 @@ def postprocess_trajectory(done_file, labels, traj_file):
 plt.ion()
 
 if __name__ == "__main__":
-
-
-    #directory = "/data/ken/ken_data/skittles_big"
-    #labeled_directory = "/data/ken/ken_data/skittles_big_labeled_new"
-
-    #directory = "/data/ken/ken_data/mm-unsafe"
-    #labeled_directory = "/data/ken/ken_data/mm-unsafe-labeled"
-
-
-    directory = "/data/ken/latent-test"
-    labeled_directory = "/data/ken/latent-test-labeled"
+    directory = "/data/vlog-test"
+    labeled_directory = "/data/vlog-test-labeled"
     # make labeled directory if it does not exist
     if not os.path.exists(labeled_directory):
         os.makedirs(labeled_directory)
 
     # Get all pickle files with "unsafe" in the filename
     hdf5_files = [f for f in os.listdir(directory)]
-    hdf5_files = [f for f in hdf5_files if "hdf5" in f]
+    hdf5_files = [f for f in hdf5_files if "safe" in f]
     print('total files:', len(hdf5_files))
     done_files = [f for f in os.listdir(labeled_directory)]
     print('done files:', len(done_files))
@@ -130,19 +141,23 @@ if __name__ == "__main__":
         traj_file = os.path.join(directory, traj_file)
 
 
-        fig, ax = plt.subplots()
 
         if not os.path.exists(traj_file):
             print(f"File {traj_file} not found, skipping.")
             continue
 
         print(f"Processing {traj_file}...")
-        process_trajectory(traj_file)
-        if images:
-            update_plot()
-            key_press_cid = fig.canvas.mpl_connect('key_press_event', on_key_press)
-            print(f"Press '0' as safe or '1' as unsafe to label {traj_file}.")
-            plt.show(block=True)
+        if "safe" in traj_file and "unsafe" not in traj_file:
+            process_trajectory_safe(traj_file)
+        else:
+            fig, ax = plt.subplots()
+
+            process_trajectory(traj_file)
+            if images:
+                update_plot()
+                key_press_cid = fig.canvas.mpl_connect('key_press_event', on_key_press)
+                print(f"Press '0' as safe or '1' as unsafe to label {traj_file}.")
+                plt.show(block=True)
 
         postprocess_trajectory(done_file, labels, traj_file)
         don += 1

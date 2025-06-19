@@ -25,8 +25,7 @@ if __name__ == "__main__":
                name="Decoder")
 
 
-    hdf5_file = '/data/ken/ken_data/skittles_trajectories.h5'
-    hdf5_file = '/data/ken/latent/consolidated.h5'
+    hdf5_file = '/data/vlog/consolidated.h5'
     H = 1
     BS = 64
     expert_data = SplitTrajectoryDataset(hdf5_file, H, split='train', num_test=100)

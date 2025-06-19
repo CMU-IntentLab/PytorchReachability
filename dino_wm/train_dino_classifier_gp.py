@@ -142,8 +142,8 @@ if __name__ == "__main__":
     EVAL_H = 16
     H = 3
 
-    hdf5_file = '/data/ken/latent-labeled/consolidated.h5'
-    hdf5_file_test = '/data/ken/latent-unsafe-test/consolidated.h5'
+    hdf5_file = '/data/vlog-labeled/consolidated.h5'
+    hdf5_file_test = '/data/vlog-test-labeled/consolidated.h5'
 
     expert_data = SplitTrajectoryDataset(hdf5_file, BL, split='train', num_test=0)
     expert_data_eval = SplitTrajectoryDataset(hdf5_file_test, BL, split='test', num_test=5)
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     device = 'cuda:0'
    
     decoder = VQVAE().to(device)
-    decoder.load_state_dict(torch.load('/home/kensuke/latent-safety/scripts/checkpoints/testing_decoder.pth'))
+    decoder.load_state_dict(torch.load('checkpoints/testing_decoder.pth'))
     decoder.eval()
 
     transition = VideoTransformer(
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         num_frames=BL-1,
         dropout=0.1
     ).to(device)
-    transition.load_state_dict(torch.load('/home/kensuke/latent-safety/scripts/checkpoints/best_testing.pth'))
+    transition.load_state_dict(torch.load('checkpoints/best_testing.pth'))
 
     for name, param in transition.named_parameters():
         param.requires_grad = name.startswith("failure_head")
@@ -349,12 +349,12 @@ if __name__ == "__main__":
                 loss = failure_loss
             print(f"\rIter {i}, Eval Loss: {loss.item():.4f},")
 
-            torch.save(transition.state_dict(), f'dino_wm/checkpoints/classifier_gp.pth')
+            torch.save(transition.state_dict(), f'checkpoints/classifier_gp.pth')
 
             if loss < best_eval:
                 best_eval = loss
                 print(f"New best at iter {i}, saving model.")
-                torch.save(transition.state_dict(), 'dino_wm/checkpoints/best_classifier_gp.pth')
+                torch.save(transition.state_dict(), 'checkpoints/best_classifier_gp.pth')
 
             
             transition.train()

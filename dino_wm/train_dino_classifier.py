@@ -92,7 +92,7 @@ if __name__ == "__main__":
     device = 'cuda:0'
    
     decoder = VQVAE().to(device)
-    decoder.load_state_dict(torch.load('/home/kensuke/latent-safety/scripts/checkpoints/testing_decoder.pth'))
+    decoder.load_state_dict(torch.load('checkpoints/testing_decoder.pth'))
     decoder.eval()
 
     transition = VideoTransformer(
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         num_frames=BL-1,
         dropout=0.1
     ).to(device)
-    transition.load_state_dict(torch.load('/home/kensuke/latent-safety/scripts/checkpoints/best_testing.pth'))
+    transition.load_state_dict(torch.load('checkpoints/best_testing.pth'))
 
     for name, param in transition.named_parameters():
         param.requires_grad = name.startswith("failure_head")

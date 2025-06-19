@@ -54,8 +54,8 @@ if __name__ == "__main__":
     EVAL_H = 16
     H = 3
 
-    hdf5_file = '/data/ken/latent/consolidated.h5'
-    hdf5_file_test = '/data/ken/latent-unsafe-test/consolidated.h5'
+    hdf5_file = '/data/vlog/consolidated.h5'
+    hdf5_file_test = '/data/vlog-test/consolidated.h5'
 
     expert_data = SplitTrajectoryDataset(hdf5_file, BL, split='train', num_test=0)
     expert_data_eval = SplitTrajectoryDataset(hdf5_file_test, BL, split='test', num_test=467)
