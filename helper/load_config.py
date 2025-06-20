@@ -12,7 +12,7 @@ import tools
 def load_config(config_path):
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+")
-    args, remaining = parser.parse_known_args()
+    args, remaining = parser.parse_known_args(sys.argv[1:])
 
     yaml = ryaml.YAML(typ="safe", pure=True)
     configs = yaml.load(pathlib.Path(config_path).read_text())
