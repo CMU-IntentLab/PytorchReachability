@@ -40,10 +40,10 @@ def get_Q(state, action, critic, l_fn, args):
     # evaluate_Q already extracts residual component for ResCritic
     val = evaluate_Q(state, action, critic)
     pred_q = val[0]
-    pred_l = val[1]
+    #pred_l = val[1]
     if args.residual:
-        print('l_fn', l_fn(state))
-        print('pred_l', pred_l)
+        #print('l_fn', l_fn(state))
+        #print('pred_l', pred_l)
         print('res val', pred_q)
         print('res val + l_fn', pred_q + l_fn(state))
         pred_q += l_fn(state)
@@ -148,7 +148,7 @@ def main(args):
 
     # Setup alpha for entropy regularization
     if args.auto_alpha:
-        target_entropy = -0.5 * np.prod(env.action_space.shape)
+        target_entropy = -np.prod(env.action_space.shape)
         log_alpha = torch.zeros(1, requires_grad=True, device=args.device)
         alpha_optim = torch.optim.Adam([log_alpha], lr=args.alpha_lr)
         alpha = (target_entropy, log_alpha, alpha_optim)

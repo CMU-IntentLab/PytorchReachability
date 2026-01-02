@@ -174,7 +174,6 @@ class avoid_DDPGPolicy_annealing_residual(BasePolicy):
         # Critic output: [batch, 2] where [:, 0] is residual, [:, 1] is baseline
         critic_output = critic(batch.obs, batch.act)
         residual_q = critic_output[:, 0].flatten()  # Extract residual component
-        baseline_q = critic_output[:, 1].flatten()  # Extract baseline component
 
         # Target Q (already includes l(x') implicitly via returns)
         target_q = batch.returns.flatten()
@@ -186,7 +185,9 @@ class avoid_DDPGPolicy_annealing_residual(BasePolicy):
 
         # Supervised learning loss for baseline using rew_cur from info dict
         baseline_loss = torch.tensor(0.0, device=critic_output.device)
-        if hasattr(batch, 'info') and batch.info is not None:
+        '''if hasattr(batch, 'info') and batch.info is not None:
+            baseline_q = critic_output.flatten()  # Extract baseline component
+
             # Handle different info structures (could be dict, Batch, or list)
             if isinstance(batch.info, dict) and 'rew_cur' in batch.info:
                 rew_cur = torch.as_tensor(batch.info['rew_cur'], device=critic_output.device, dtype=torch.float32).flatten()
@@ -195,10 +196,10 @@ class avoid_DDPGPolicy_annealing_residual(BasePolicy):
             elif isinstance(batch.info, Batch) and hasattr(batch.info, 'rew_cur'):
                 rew_cur = torch.as_tensor(batch.info.rew_cur, device=critic_output.device, dtype=torch.float32).flatten()
                 if rew_cur.shape == baseline_q.shape:
-                    baseline_loss = (baseline_q - rew_cur).pow(2).mean()
+                    baseline_loss = (baseline_q - rew_cur).pow(2).mean()'''
 
         # Combine losses
-        total_critic_loss = critic_loss + baseline_loss
+        total_critic_loss = critic_loss #+ baseline_loss
 
         optimizer.zero_grad()
         total_critic_loss.backward()

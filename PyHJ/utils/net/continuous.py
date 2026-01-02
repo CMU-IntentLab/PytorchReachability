@@ -185,7 +185,7 @@ class ResCritic(nn.Module):
         input_dim = getattr(preprocess_net, "output_dim", preprocess_net_output_dim)
         self.last = MLP(
             input_dim,  # type: ignore
-            2,
+            1,
             hidden_sizes,
             device=self.device,
             linear_layer=linear_layer,
@@ -218,10 +218,8 @@ class ResCritic(nn.Module):
             obs = torch.cat([obs, act], dim=1)
         logits, hidden = self.preprocess(obs)
         logits = self.last(logits)  # shape: [batch, 2]
-        residual = -torch.nn.functional.softplus(logits[:, 0:1])  # shape: [batch, 1], ≤ 0
-        baseline = logits[:, 1:2]  # shape: [batch, 1], unbounded
-        output = torch.cat([residual, baseline], dim=1)  # shape: [batch, 2]
-        return output
+        residual = -torch.nn.functional.softplus(logits)  # shape: [batch, 1], ≤ 0
+        return residual
 
 class ActorProb(nn.Module):
     """Simple actor network (output with a Gauss distribution).

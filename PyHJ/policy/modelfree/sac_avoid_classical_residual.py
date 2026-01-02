@@ -157,6 +157,9 @@ class avoid_SACPolicy_annealing_residual(DDPGPolicy):
         if critic1_output.shape[1] == 2:
             critic1_residual = critic1_output[:, [0]] # shape: [batch, 1]
             critic2_residual = critic2_output[:, [0]]
+        else:
+            critic1_residual = critic1_output
+            critic2_residual = critic2_output
         
         target_q = torch.min(critic1_residual, critic2_residual) #- self._alpha * obs_next_result.log_prob
         return target_q
