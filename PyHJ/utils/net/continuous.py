@@ -140,6 +140,89 @@ class Critic(nn.Module):
         return logits
 
 
+class ResCritic(nn.Module):
+    """Residual critic network. Outputs two values: residual (Q(s,a) - l(s)) \
+    and baseline l(s). The residual is upper bounded by 0 using negative softplus, \
+    while the baseline is unbounded and can be learned via supervised learning.
+
+    :param preprocess_net: a self-defined preprocess_net which output a
+        flattened hidden state.
+    :param hidden_sizes: a sequence of int for constructing the MLP after
+        preprocess_net. Default to empty sequence (where the MLP now contains
+        only a single linear layer).
+    :param int preprocess_net_output_dim: the output dimension of
+        preprocess_net.
+    :param linear_layer: use this module as linear layer. Default to nn.Linear.
+    :param bool flatten_input: whether to flatten input data for the last layer.
+        Default to True.
+
+    The output is a tensor of shape [batch, 2] where:
+        - [:, 0] is the residual (Q(s,a) - l(s)), ≤ 0
+        - [:, 1] is the baseline l(s), unbounded
+
+    For advanced usage (how to customize the network), please refer to
+    :ref:`build_the_network`.
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.utils.net.common.Net` as an instance
+        of how preprocess_net is suggested to be defined.
+    """
+
+    def __init__(
+        self,
+        preprocess_net: nn.Module,
+        hidden_sizes: Sequence[int] = (),
+        device: Union[str, int, torch.device] = "cpu",
+        preprocess_net_output_dim: Optional[int] = None,
+        linear_layer: Type[nn.Linear] = nn.Linear,
+        flatten_input: bool = True,
+    ) -> None:
+        super().__init__()
+        self.device = device
+        self.preprocess = preprocess_net
+        self.output_dim = 1
+        input_dim = getattr(preprocess_net, "output_dim", preprocess_net_output_dim)
+        self.last = MLP(
+            input_dim,  # type: ignore
+            2,
+            hidden_sizes,
+            device=self.device,
+            linear_layer=linear_layer,
+            flatten_input=flatten_input,
+        )
+
+    def forward(
+        self,
+        obs: Union[np.ndarray, torch.Tensor],
+        act: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        info: Dict[str, Any] = {},
+    ) -> torch.Tensor:
+        """Mapping: (s, a) -> logits -> [residual, baseline].
+        
+        Returns a tensor of shape [batch, 2] where:
+        - [:, 0] is residual (Q(s,a) - l(s)), ≤ 0 via negative softplus
+        - [:, 1] is baseline l(s), unbounded
+        """
+        obs = torch.as_tensor(
+            obs,
+            device=self.device,
+            dtype=torch.float32,
+        ).flatten(1)
+        if act is not None:
+            act = torch.as_tensor(
+                act,
+                device=self.device,
+                dtype=torch.float32,
+            ).flatten(1)
+            obs = torch.cat([obs, act], dim=1)
+        logits, hidden = self.preprocess(obs)
+        logits = self.last(logits)  # shape: [batch, 2]
+        residual = -torch.nn.functional.softplus(logits[:, 0:1])  # shape: [batch, 1], ≤ 0
+        baseline = logits[:, 1:2]  # shape: [batch, 1], unbounded
+        output = torch.cat([residual, baseline], dim=1)  # shape: [batch, 2]
+        return output
+
 class ActorProb(nn.Module):
     """Simple actor network (output with a Gauss distribution).
 

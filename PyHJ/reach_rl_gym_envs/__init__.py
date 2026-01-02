@@ -37,14 +37,26 @@ register(
 register(
     id="dubins-v0",
     entry_point="PyHJ.reach_rl_gym_envs.dubins:Dubins_Env",
-    max_episode_steps=1000,
+    max_episode_steps=50,
     reward_threshold=1e8,
 )
 
 register(
+    id="res-dubins-v0",
+    entry_point="PyHJ.reach_rl_gym_envs.dubins:Res_Dubins_Env",
+    max_episode_steps=50,
+    reward_threshold=1e8,
+)
+register(
     id="dubins4d-v0",
     entry_point="PyHJ.reach_rl_gym_envs.dubins4d:Dubins_Env_4D",
-    max_episode_steps=1000,
+    max_episode_steps=50,
+    reward_threshold=1e8,
+)
+register(
+    id="res-dubins4d-v0",
+    entry_point="PyHJ.reach_rl_gym_envs.dubins4d:Res_Dubins_Env_4D",
+    max_episode_steps=50,
     reward_threshold=1e8,
 )
 

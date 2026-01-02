@@ -11,10 +11,10 @@ import torch
 
 from PyHJ.data import Batch, ReplayBuffer
 from PyHJ.exploration import BaseNoise, GaussianNoise
-from PyHJ.policy.modelfree.BasePolicy_Annealing_Avoid import BasePolicy_Annealing_Avoid as BasePolicy # correct
+from PyHJ.policy.modelfree.ResBasePolicy_Annealing_Avoid import ResBasePolicy_Annealing_Avoid as BasePolicy # correct
 
 
-class avoid_DDPGPolicy_annealing(BasePolicy):
+class avoid_DDPGPolicy_annealing_residual(BasePolicy):
     """Implementation of Deep Deterministic Policy Gradient. arXiv:1509.02971, 
         for learning the classical reach-avoid value function, arXiv:2112.12288.
 
@@ -91,7 +91,8 @@ class avoid_DDPGPolicy_annealing(BasePolicy):
         self._n_step = estimation_step
         self.actor_gradient_steps = actor_gradient_steps
         self.warmup = False
-
+        assert l_fn is not None, "You must provide an analytic baseline function l_fn"
+        self.l_fn = l_fn
     def set_exp_noise(self, noise: Optional[BaseNoise]) -> None:
         """Set the exploration noise."""
         self._noise = noise
@@ -111,10 +112,13 @@ class avoid_DDPGPolicy_annealing(BasePolicy):
     def _target_q(self, buffer: ReplayBuffer, indices: np.ndarray) -> torch.Tensor:
         """Predict the value of a state"""
         batch = buffer[indices]  # batch.obs_next: s_{t+n}
-        target_q = self.critic_old(
+        critic_output = self.critic_old(
             batch.obs_next,
             self(batch, model='actor_old', input='obs_next').act
         )
+        target_q = critic_output[:, 0]  # Extract residual component
+        print('target_q shape: ', target_q.shape)
+        import ipdb; ipdb.set_trace()
         return target_q
     
 
@@ -160,19 +164,47 @@ class avoid_DDPGPolicy_annealing(BasePolicy):
 
     @staticmethod
     def _mse_optimizer(
-        batch: Batch, critic: torch.nn.Module, optimizer: torch.optim.Optimizer
+        batch: Batch,
+        critic: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """A simple wrapper script for updating critic network."""
+
         weight = getattr(batch, "weight", 1.0)
-        current_q = critic(batch.obs, batch.act).flatten()
+
+        # Critic output: [batch, 2] where [:, 0] is residual, [:, 1] is baseline
+        critic_output = critic(batch.obs, batch.act)
+        residual_q = critic_output[:, 0].flatten()  # Extract residual component
+        baseline_q = critic_output[:, 1].flatten()  # Extract baseline component
+
+        # Target Q (already includes l(x') implicitly via returns)
         target_q = batch.returns.flatten()
-        td = current_q - target_q
+
+        # Residual TD loss
+        
+        td = residual_q - target_q
         critic_loss = (td.pow(2) * weight).mean()
 
+        # Supervised learning loss for baseline using rew_cur from info dict
+        baseline_loss = torch.tensor(0.0, device=critic_output.device)
+        if hasattr(batch, 'info') and batch.info is not None:
+            # Handle different info structures (could be dict, Batch, or list)
+            if isinstance(batch.info, dict) and 'rew_cur' in batch.info:
+                rew_cur = torch.as_tensor(batch.info['rew_cur'], device=critic_output.device, dtype=torch.float32).flatten()
+                if rew_cur.shape == baseline_q.shape:
+                    baseline_loss = (baseline_q - rew_cur).pow(2).mean()
+            elif isinstance(batch.info, Batch) and hasattr(batch.info, 'rew_cur'):
+                rew_cur = torch.as_tensor(batch.info.rew_cur, device=critic_output.device, dtype=torch.float32).flatten()
+                if rew_cur.shape == baseline_q.shape:
+                    baseline_loss = (baseline_q - rew_cur).pow(2).mean()
+
+        # Combine losses
+        total_critic_loss = critic_loss + baseline_loss
+
         optimizer.zero_grad()
-        critic_loss.backward()
+        total_critic_loss.backward()
         optimizer.step()
-        return td, critic_loss
+
+        return td.detach(), total_critic_loss
 
     def learn(self, batch: Batch, **kwargs: Any) -> Dict[str, float]:
         """Update critic network and actor network"""
@@ -186,7 +218,10 @@ class avoid_DDPGPolicy_annealing(BasePolicy):
         if not self.warmup:
             for _ in range(self.actor_gradient_steps):
                 act = self(batch, model="actor").act
-                actor_loss = -self.critic(batch.obs, act).mean()
+                critic_output = self.critic(batch.obs, act)
+                residual_q = critic_output[:, 0]  # Extract residual component
+                l_fn_value = torch.tensor(self.l_fn(batch.obs)).to(self.critic.device)
+                actor_loss = -(residual_q + l_fn_value).mean()
                 self.actor_optim.zero_grad()
                 actor_loss.backward()
                 self.actor_optim.step()
@@ -206,7 +241,7 @@ class avoid_DDPGPolicy_annealing(BasePolicy):
         
         if self._noise is None:
             act = act
-        if isinstance(act, np.ndarray):
+        elif isinstance(act, np.ndarray):
             act =  act + self._noise(act.shape)
         else:
             warnings.warn("Cannot add exploration noise to non-numpy_array action.")

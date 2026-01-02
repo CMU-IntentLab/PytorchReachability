@@ -13,7 +13,7 @@ from PyHJ.policy.modelfree.sac_reach_avoid_classical import reach_avoid_SACPolic
 from PyHJ.policy.modelfree.sac_avoid_classical import avoid_SACPolicy_annealing
 from PyHJ.policy.modelfree.ddpg_avoid_classical import avoid_DDPGPolicy_annealing
 from PyHJ.policy.modelfree.ddpg_avoid_classical_acreg import avoid_DDPGPolicy_annealing_acreg
-
+from PyHJ.policy.modelfree.ddpg_avoid_classical_residual import avoid_DDPGPolicy_annealing_residual
 __all__ = [
     "BasePolicy",
     "RandomPolicy",
@@ -23,6 +23,7 @@ __all__ = [
     "reach_avoid_game_SACPolicy_annealing", # arXiv:2112.12288, implemented using SAC
     "avoid_DDPGPolicy_annealing",
     "avoid_DDPGPolicy_annealing_acreg",
-    "avoid_SACPolicy_annealing"
+    "avoid_SACPolicy_annealing",
+    "avoid_DDPGPolicy_annealing_residual"
 ]
 

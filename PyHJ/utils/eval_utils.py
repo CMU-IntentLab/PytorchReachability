@@ -12,5 +12,20 @@ def find_a(state, policy):
 def evaluate_V(state, policy, critic):
     tmp_obs = np.array(state).reshape(1,-1)
     tmp_batch = Batch(obs = tmp_obs, info = Batch())
-    tmp = critic(tmp_batch.obs, policy(tmp_batch, model="actor_old").act)
+    critic_output = critic(tmp_batch.obs, policy(tmp_batch, model="actor_old").act)
+    # Extract residual component (first column) for ResCritic
+    if critic_output.shape[1] == 2:
+        tmp = critic_output[:, 0]
+    else:
+        tmp = critic_output
+    return tmp.cpu().detach().numpy().flatten()
+
+def evaluate_Q(state, action, critic):
+    #print(state.shape, action.shape)
+    tmp_obs = np.array(state).reshape(1,-1)
+    action = np.array(action).reshape(1,-1)
+    tmp_batch = Batch(obs = tmp_obs, info = Batch())
+
+    tmp = critic(tmp_batch.obs, action)
+    
     return tmp.cpu().detach().numpy().flatten()
