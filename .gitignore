@@ -8,3 +8,4 @@ LCRL/policy/__pycache__/
 # Logs and outputs
 logs/
 outputs/
+wandb/

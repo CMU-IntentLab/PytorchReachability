@@ -1,0 +1,19 @@
+program: scripts/train.py
+method: grid
+metric:
+  name: eval/avg_error
+  goal: minimize
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args}
+
+parameters:
+  mode:
+    values: ["sac", "ddpg"]
+  warmup:
+    values: [true, false]
+  residual:
+    values: [true, false]

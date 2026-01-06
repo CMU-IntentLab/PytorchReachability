@@ -1,4 +1,0 @@
-critic-activation: "ReLU" # type=str, default="ReLU")
-critic-net: [128, 128, 128] 
-critic-lr: 1e-3
-residual: True

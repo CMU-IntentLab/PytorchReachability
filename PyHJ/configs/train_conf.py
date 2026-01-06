@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Literal
-
+from tyro.conf import FlagConversionOff
 @dataclass
 class Args:
   # Environment
-  task: str = "dubins-v0"
+  task: str = "dubins4d-v0"
   logdir: str = "logs"
   seed: int = 42
   device: str = "cuda" 
@@ -16,8 +16,8 @@ class Args:
   tau: float = 0.005 # type=float, default=0.005)
   exploration_noise: float = 0.1 # type=float, default=0.1)
   epoch: int = 1 # type=int, default=10)
-  total_episodes: int = 15 # type=int, default=160)
-  step_per_epoch: int = 40000 # type=int, default=40000)
+  total_episodes: int = 10 # type=int, default=160)
+  step_per_epoch: int = 10000 # type=int, default=40000)
   step_per_collect: int = 8 # type=int, default=8)
   update_per_step: float = 0.125 # type=float, default=0.125)
   batch_size_pyhj: int = 512 # type=int, default=512)
@@ -41,6 +41,9 @@ class Args:
   kwargs: dict = field(default_factory=dict) # type=str, default="{}")
 
 
-  residual: bool = False
-  warmup_epoch: int = 0
-  off_policy: bool = False
+  residual: FlagConversionOff[bool] = False
+  warmup: FlagConversionOff[bool] = False
+  #off_policy: FlagConversionOff[bool] = False
+  mode: Literal["sac", "ddpg"] = "ddpg"
+  use_wandb: bool = True
+  wandb_project: str | None = 'HJ-RL'

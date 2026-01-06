@@ -144,7 +144,7 @@ def main(args):
     critic,
     critic_optim,
     tau=args.tau,
-    gamma=args.gamma,
+    gamma=args.gamma_pyhj,
     exploration_noise=GaussianNoise(sigma=args.exploration_noise),
     reward_normalization=args.rew_norm,
     estimation_step=args.n_step,
@@ -165,7 +165,7 @@ def main(args):
     len(args.critic_net),
     args.control_net[0],
     len(args.control_net),
-    args.gamma
+    args.gamma_pyhj
     ))
 
 
@@ -186,7 +186,7 @@ def main(args):
             args.exploration_noise, 
             args.actor_lr, 
             args.critic_lr, 
-            args.batch_size,
+            args.batch_size_pyhj,
             args.step_per_epoch,
             args.kwargs,
             args.seed
@@ -221,7 +221,7 @@ def main(args):
             policy.warmup = True
             print("Warmup mode")
         else:
-            policy._gamma = args.gamma
+            policy._gamma = args.gamma_pyhj
             policy.warmup = False
             print("Training mode")
         if args.continue_training_epoch is not None:
@@ -254,7 +254,7 @@ def main(args):
         args.step_per_epoch,
         args.step_per_collect,
         args.test_num,
-        args.batch_size,
+        args.batch_size_pyhj,
         update_per_step=args.update_per_step,
         stop_fn=stop_fn,
         save_best_fn=save_best_fn,

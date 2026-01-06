@@ -27,6 +27,12 @@ import typing
 from PyHJ.utils.eval_utils import evaluate_V, evaluate_Q, find_a
 from termcolor import cprint
 
+activation_dict = {}
+activation_dict['ReLU'] = torch.nn.ReLU
+activation_dict['Tanh'] = torch.nn.Tanh
+activation_dict['Sigmoid'] = torch.nn.Sigmoid
+activation_dict['SiLU'] = torch.nn.SiLU
+
 def get_V(state, policy, critic, l_fn, args):
     if args.residual:
         # evaluate_V already extracts residual component for ResCritic
@@ -40,10 +46,7 @@ def get_Q(state, action, critic, l_fn, args):
     # evaluate_Q already extracts residual component for ResCritic
     val = evaluate_Q(state, action, critic)
     pred_q = val[0]
-    #pred_l = val[1]
     if args.residual:
-        #print('l_fn', l_fn(state))
-        #print('pred_l', pred_l)
         print('res val', pred_q)
         print('res val + l_fn', pred_q + l_fn(state))
         pred_q += l_fn(state)
@@ -51,14 +54,7 @@ def get_Q(state, action, critic, l_fn, args):
 
 
 def make_critic(args):
-    if args.critic_activation == 'ReLU':
-        critic_activation = torch.nn.ReLU
-    elif args.critic_activation == 'Tanh':
-        critic_activation = torch.nn.Tanh
-    elif args.critic_activation == 'Sigmoid':
-        critic_activation = torch.nn.Sigmoid
-    elif args.critic_activation == 'SiLU':
-        critic_activation = torch.nn.SiLU
+    critic_activation = activation_dict[args.critic_activation]
 
     critic_net = Net(
         args.state_shape,
@@ -79,15 +75,7 @@ def make_critic(args):
     return critic1, critic1_optim, critic2, critic2_optim
 
 def make_actor(args):
-    if args.actor_activation == 'ReLU':
-        actor_activation = torch.nn.ReLU
-    elif args.actor_activation == 'Tanh':
-        actor_activation = torch.nn.Tanh
-    elif args.actor_activation == 'Sigmoid':
-        actor_activation = torch.nn.Sigmoid
-    elif args.actor_activation == 'SiLU':
-        actor_activation = torch.nn.SiLU
-
+    actor_activation = activation_dict[args.actor_activation]
     actor_net = Net(
         args.state_shape,
         args.action_shape,
@@ -95,19 +83,19 @@ def make_actor(args):
         activation=actor_activation,
         device=args.device
     )
-    actor = ActorProb(actor_net, args.action_shape, device=args.device).to(args.device)
+    if args.mode == 'sac':
+        actor = ActorProb(actor_net, args.action_shape, device=args.device).to(args.device)
+    else:
+        actor = Actor(actor_net, args.action_shape, device=args.device).to(args.device) # DDPG has determistic actor
     actor_optim = torch.optim.Adam(actor.parameters(), lr=args.actor_lr)
     return actor, actor_optim
 
 def main(args):
+    assert 'res' not in args.task, "deprecated"
+    if args.residual:
+        args.task = 'res-'+args.task
     task = args.task
-    print(f"task: {task}")
-    if 'res' in task and not args.residual:
-        print("Residual critic is required for this task")
-        exit()
-    if 'res' not in task and args.residual:
-        print("Residual critic is not required for this task")
-        exit()
+
     env = gym.make(args.task)
     assert hasattr(env, 'action_space')
     args.state_shape = env.observation_space.shape or env.observation_space.n

@@ -117,8 +117,6 @@ class avoid_DDPGPolicy_annealing_residual(BasePolicy):
             self(batch, model='actor_old', input='obs_next').act
         )
         target_q = critic_output[:, 0]  # Extract residual component
-        print('target_q shape: ', target_q.shape)
-        import ipdb; ipdb.set_trace()
         return target_q
     
 
