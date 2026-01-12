@@ -173,12 +173,10 @@ class avoid_SACPolicy_annealing(DDPGPolicy):
         current_q1a = self.critic1(batch.obs, act).flatten()
         current_q2a = self.critic2(batch.obs, act).flatten()
         pure_critic_value1 = torch.min(current_q1a, current_q2a)
-        
-        rot_cost = torch.norm(act[:, 3:6], dim=1)
         actor1_loss = (
             self._alpha * obs_result1.log_prob.flatten() -
             pure_critic_value1
-        ).mean() + 0.1*rot_cost.mean()
+        ).mean()
         self.actor1_optim.zero_grad()
         actor1_loss.backward(retain_graph=True)
         self.actor1_optim.step()
@@ -197,7 +195,6 @@ class avoid_SACPolicy_annealing(DDPGPolicy):
 
         result = {
             "loss/actor1": -pure_critic_value1.mean().item(),
-            #"loss/rotation": rot_cost.mean().item(),
             "loss/critic1": critic1_loss.item(),
             "loss/critic2": critic2_loss.item(),
         }
